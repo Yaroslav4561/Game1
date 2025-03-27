@@ -37,29 +37,67 @@ public class GridManager : MonoBehaviour
 
     public void SwapGems(GameObject gemA, GameObject gemB)
     {
-        Vector2 posA = gemA.transform.position;
-        Vector2 posB = gemB.transform.position;
+        if (gemA == null || gemB == null)
+        {
+            Debug.LogError("Один із переданих каменів є null!");
+            return;
+        }
 
         Gem gemAScript = gemA.GetComponent<Gem>();
         Gem gemBScript = gemB.GetComponent<Gem>();
 
+        if (gemAScript == null || gemBScript == null)
+        {
+            Debug.LogError("Один із переданих об'єктів не містить компонента Gem!");
+            return;
+        }
+
         int xA = gemAScript.x, yA = gemAScript.y;
         int xB = gemBScript.x, yB = gemBScript.y;
 
-        if (Mathf.Abs(xA - xB) + Mathf.Abs(yA - yB) == 1) // Перевірка, що обмін можливий (сусідні елементи)
+        // Перевіряємо, що обмін можливий (лише сусідні елементи)
+        if (Mathf.Abs(xA - xB) + Mathf.Abs(yA - yB) == 1)
         {
+            // Міняємо місцями об'єкти у масиві grid
             grid[xA, yA] = gemB;
             grid[xB, yB] = gemA;
 
-            gemA.transform.position = posB;
-            gemB.transform.position = posA;
+            // Міняємо місцями їх позиції у грі з плавною анімацією
+            StartCoroutine(SmoothSwap(gemA, gemB, gemA.transform.position, gemB.transform.position));
 
+            // Оновлюємо координати у Gem скриптах
             gemAScript.SetPosition(xB, yB);
             gemBScript.SetPosition(xA, yA);
 
             StartCoroutine(CheckMatches());
         }
+        else
+        {
+            Debug.LogError("Обмін можливий лише між сусідніми елементами!");
+        }
     }
+
+    // Корутин для плавної зміни позицій
+    IEnumerator SmoothSwap(GameObject gemA, GameObject gemB, Vector3 startPosA, Vector3 startPosB)
+    {
+        float duration = 0.2f; // Тривалість анімації
+        float elapsedTime = 0;
+
+        while (elapsedTime < duration)
+        {
+            elapsedTime += Time.deltaTime;
+            float t = elapsedTime / duration;
+            gemA.transform.position = Vector3.Lerp(startPosA, startPosB, t);
+            gemB.transform.position = Vector3.Lerp(startPosB, startPosA, t);
+            yield return null;
+        }
+
+        // Гарантуємо, що об'єкти точно знаходяться в правильних позиціях після анімації
+        gemA.transform.position = startPosB;
+        gemB.transform.position = startPosA;
+    }
+
+
 
     IEnumerator CheckMatches()
     {
@@ -102,18 +140,48 @@ public class GridManager : MonoBehaviour
 
         if (matchedGems.Count > 0)
         {
+            List<Vector2> emptyPositions = new List<Vector2>();
+
             foreach (GameObject gem in matchedGems)
             {
-                int x = gem.GetComponent<Gem>().x;
-                int y = gem.GetComponent<Gem>().y;
-                grid[x, y] = null;
-                Destroy(gem);
+                if (gem != null)
+                {
+                    int x = gem.GetComponent<Gem>().x;
+                    int y = gem.GetComponent<Gem>().y;
+
+                    // Додаємо позицію до списку порожніх
+                    emptyPositions.Add(new Vector2(x, y));
+
+                    // Запускаємо анімацію знищення
+                    StartCoroutine(DestroyWithAnimation(gem, x, y));
+                }
             }
 
             yield return new WaitForSeconds(0.3f);
             RefillGrid();
         }
     }
+
+    // Анімація зменшення перед знищенням
+    IEnumerator DestroyWithAnimation(GameObject gem, int x, int y)
+    {
+        float duration = 0.2f;
+        float elapsedTime = 0;
+        Vector3 originalScale = gem.transform.localScale;
+
+        while (elapsedTime < duration)
+        {
+            elapsedTime += Time.deltaTime;
+            float t = elapsedTime / duration;
+            gem.transform.localScale = Vector3.Lerp(originalScale, Vector3.zero, t);
+            yield return null;
+        }
+
+        // Видаляємо елемент
+        Destroy(gem);
+        grid[x, y] = null;
+    }
+
 
     void RefillGrid()
     {
@@ -128,10 +196,34 @@ public class GridManager : MonoBehaviour
                     GameObject newGem = Instantiate(gems[randomIndex], position, Quaternion.identity);
                     newGem.GetComponent<Gem>().SetPosition(x, y);
                     grid[x, y] = newGem;
+
+                    // Запускаємо анімацію появи
+                    StartCoroutine(SmoothAppear(newGem));
                 }
             }
         }
 
         StartCoroutine(CheckMatches());
     }
+
+    // Плавна анімація появи
+    IEnumerator SmoothAppear(GameObject gem)
+    {
+        float duration = 0.3f; // Тривалість анімації
+        float elapsedTime = 0;
+        Vector3 originalScale = gem.transform.localScale;
+        gem.transform.localScale = Vector3.zero; // Початковий масштаб 0
+
+        while (elapsedTime < duration)
+        {
+            elapsedTime += Time.deltaTime;
+            float t = elapsedTime / duration;
+            gem.transform.localScale = Vector3.Lerp(Vector3.zero, originalScale, t);
+            yield return null;
+        }
+
+        // Гарантуємо, що об'єкт буде мати правильний розмір в кінці
+        gem.transform.localScale = originalScale;
+    }
+
 }
