@@ -4,8 +4,8 @@ using UnityEngine.UI;
 
 public class Timer : MonoBehaviour
 {
-    public Text timerText; // ��������� �� UI Text
-    public float timeRemaining = 60f; // ���������� ��� � ��������
+    public Text timerText;
+    public float timeRemaining = 60f; 
     private bool isRunning = true;
 
     void Update()
