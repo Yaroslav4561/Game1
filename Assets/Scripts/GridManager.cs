@@ -9,6 +9,7 @@ public class GridManager : MonoBehaviour
     public GameObject[,] grid;
     private GameObject selectedGem;
     private bool isProcessing = false;
+    private bool isGameOver = false;
 
     void Start()
     {
@@ -46,7 +47,7 @@ public class GridManager : MonoBehaviour
 
     public void SwapGems(GameObject gemA, GameObject gemB)
     {
-        if (isProcessing) return;
+        if (isProcessing || isGameOver) return;// Забороняємо рух під час анімації
 
         if (gemA == null || gemB == null)
         {
@@ -66,19 +67,15 @@ public class GridManager : MonoBehaviour
         int xA = gemAScript.x, yA = gemAScript.y;
         int xB = gemBScript.x, yB = gemBScript.y;
 
-        // Додаємо перевірку, щоб гарантувати, що обмін між сусідніми елементами
         if ((xA == xB && Mathf.Abs(yA - yB) == 1) || (yA == yB && Mathf.Abs(xA - xB) == 1))
         {
-            isProcessing = true;
+            isProcessing = true; // Блокування руху
 
-            // Міняємо місцями об'єкти у масиві grid
             grid[xA, yA] = gemB;
             grid[xB, yB] = gemA;
 
-            // Міняємо місцями їх позиції у грі з плавною анімацією
             StartCoroutine(SmoothSwap(gemA, gemB, gemA.transform.position, gemB.transform.position));
 
-            // Оновлюємо координати у Gem скриптах
             gemAScript.SetPosition(xB, yB);
             gemBScript.SetPosition(xA, yA);
 
@@ -93,8 +90,8 @@ public class GridManager : MonoBehaviour
     // Корутин для плавної зміни позицій
     IEnumerator SmoothSwap(GameObject gemA, GameObject gemB, Vector3 startPosA, Vector3 startPosB)
     {
-        isProcessing = true;
-        float duration = 0.2f; // Тривалість анімації
+        isProcessing = true; // Забороняємо рух камінців
+        float duration = 0.2f;
         float elapsedTime = 0;
 
         while (elapsedTime < duration)
@@ -106,12 +103,9 @@ public class GridManager : MonoBehaviour
             yield return null;
         }
 
-        // Гарантуємо, що об'єкти точно знаходяться в правильних позиціях після анімації
         gemA.transform.position = startPosB;
         gemB.transform.position = startPosA;
-
     }
-
 
 
     IEnumerator CheckMatches()
@@ -119,7 +113,6 @@ public class GridManager : MonoBehaviour
         yield return new WaitForSeconds(0.2f);
         List<GameObject> matchedGems = new List<GameObject>();
 
-        // Перевірка горизонтальних збігів
         for (int y = 0; y < height; y++)
         {
             for (int x = 0; x < width - 2; x++)
@@ -136,7 +129,6 @@ public class GridManager : MonoBehaviour
             }
         }
 
-        // Перевірка вертикальних збігів
         for (int x = 0; x < width; x++)
         {
             for (int y = 0; y < height - 2; y++)
@@ -155,29 +147,37 @@ public class GridManager : MonoBehaviour
 
         if (matchedGems.Count > 0)
         {
+            if (ScoreManager.Instance != null && matchedGems.Count > 0)
+            {
+                int baseScore = 0;
+                int matchCount = matchedGems.Count;
+
+                if (matchCount == 3) baseScore = 10;
+                else if (matchCount == 4) baseScore = 15;
+                else if (matchCount == 5) baseScore = 20;
+                else if (matchCount >= 6) baseScore = 25;
+
+                ScoreManager.Instance.AddScore(baseScore);
+            }
+
             foreach (GameObject gem in matchedGems)
             {
                 if (gem != null)
                 {
                     int x = gem.GetComponent<Gem>().x;
                     int y = gem.GetComponent<Gem>().y;
-
-                    // Запускаємо анімацію знищення
                     StartCoroutine(DestroyWithAnimation(gem, x, y));
                 }
             }
 
             yield return new WaitForSeconds(0.3f);
-
-            // 🔹 Додаємо виклик DropGems() перед RefillGrid()
             StartCoroutine(DropGems());
         }
         else
         {
-            isProcessing = false; // 🔹 Розблокування якщо немає збігів
+            isProcessing = false;
         }
     }
-
 
     // Анімація зменшення перед знищенням
     IEnumerator DestroyWithAnimation(GameObject gem, int x, int y)
@@ -194,7 +194,6 @@ public class GridManager : MonoBehaviour
             yield return null;
         }
 
-        // Видаляємо елемент
         Destroy(gem);
         grid[x, y] = null;
     }
@@ -202,13 +201,13 @@ public class GridManager : MonoBehaviour
 
     IEnumerator RefillGrid()
     {
-        yield return new WaitForSeconds(0.3f); // Додаємо невелику затримку, щоб уникнути багів
+        yield return new WaitForSeconds(0.3f);
 
         for (int x = 0; x < width; x++)
         {
             for (int y = 0; y < height; y++)
             {
-                if (grid[x, y] == null) // Тільки якщо місце справді порожнє
+                if (grid[x, y] == null)
                 {
                     Vector2 position = new Vector2(x - (width - 1) / 2f, height + 1) + (Vector2)Camera.main.transform.position;
                     int randomIndex = Random.Range(0, gems.Length);
@@ -217,36 +216,14 @@ public class GridManager : MonoBehaviour
                     newGem.GetComponent<Gem>().SetPosition(x, y);
                     grid[x, y] = newGem;
 
-                    StartCoroutine(SmoothDrop(newGem, y)); // Анімація падіння
+                    StartCoroutine(SmoothDrop(newGem, y));
                 }
             }
         }
 
         yield return new WaitForSeconds(0.5f);
         isProcessing = false;
-        StartCoroutine(CheckMatches()); // Перевіряємо нові комбінації після заповнення
-    }
-
-
-
-    // Плавна анімація появи
-    IEnumerator SmoothAppear(GameObject gem)
-    {
-        float duration = 0.3f; // Тривалість анімації
-        float elapsedTime = 0;
-        Vector3 originalScale = gem.transform.localScale;
-        gem.transform.localScale = Vector3.zero; // Початковий масштаб 0
-
-        while (elapsedTime < duration)
-        {
-            elapsedTime += Time.deltaTime;
-            float t = elapsedTime / duration;
-            gem.transform.localScale = Vector3.Lerp(Vector3.zero, originalScale, t);
-            yield return null;
-        }
-
-        // Гарантуємо, що об'єкт буде мати правильний розмір в кінці
-        gem.transform.localScale = originalScale;
+        StartCoroutine(CheckMatches());
     }
     IEnumerator DropGems()
     {
@@ -254,23 +231,18 @@ public class GridManager : MonoBehaviour
 
         for (int x = 0; x < width; x++)
         {
-            for (int y = height - 1; y >= 0; y--) // Йдемо знизу вгору
+            for (int y = height - 1; y >= 0; y--)
             {
-                if (grid[x, y] == null) // Якщо є порожнє місце
+                if (grid[x, y] == null)
                 {
                     needToRefill = true;
-                    for (int aboveY = y - 1; aboveY >= 0; aboveY--) // Шукаємо елемент вище
+                    for (int aboveY = y - 1; aboveY >= 0; aboveY--)
                     {
                         if (grid[x, aboveY] != null)
                         {
-                            // Опускаємо його вниз
                             grid[x, y] = grid[x, aboveY];
                             grid[x, aboveY] = null;
-
-                            // Оновлюємо координати у Gem
                             grid[x, y].GetComponent<Gem>().SetPosition(x, y);
-
-                            // Анімація падіння
                             StartCoroutine(SmoothDrop(grid[x, y], y));
                             break;
                         }
@@ -285,7 +257,12 @@ public class GridManager : MonoBehaviour
         {
             StartCoroutine(RefillGrid());
         }
+        else
+        {
+            isProcessing = false;
+        }
     }
+
 
     IEnumerator SmoothDrop(GameObject gem, int targetY)
     {
@@ -304,5 +281,8 @@ public class GridManager : MonoBehaviour
 
         gem.transform.position = targetPos;
     }
-
+    public void SetGameOver()
+    {
+        isGameOver = true;
+    }
 }

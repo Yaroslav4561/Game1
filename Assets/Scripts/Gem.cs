@@ -31,19 +31,19 @@ public class Gem : MonoBehaviour
 
         if (Mathf.Abs(direction.x) > swipeThreshold || Mathf.Abs(direction.y) > swipeThreshold)
         {
-            if (Mathf.Abs(direction.x) > Mathf.Abs(direction.y))  // Горизонтальний рух
+            if (Mathf.Abs(direction.x) > Mathf.Abs(direction.y))  
             {
                 if (direction.x > 0)
-                    gridManager.SwapGems(gameObject, GetNeighbor(Vector2.right));  // свайп вправо
+                    gridManager.SwapGems(gameObject, GetNeighbor(Vector2.right)); 
                 else
-                    gridManager.SwapGems(gameObject, GetNeighbor(Vector2.left));   // свайп вліво
+                    gridManager.SwapGems(gameObject, GetNeighbor(Vector2.left)); 
             }
-            else  // Вертикальний рух
+            else
             {
                 if (direction.y > 0)
-                    gridManager.SwapGems(gameObject, GetNeighbor(Vector2.down));  // Інвертований рух: свайп вниз
+                    gridManager.SwapGems(gameObject, GetNeighbor(Vector2.down));  
                 else
-                    gridManager.SwapGems(gameObject, GetNeighbor(Vector2.up));    // Інвертований рух: свайп вгору
+                    gridManager.SwapGems(gameObject, GetNeighbor(Vector2.up));  
             }
         }
     }
